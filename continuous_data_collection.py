@@ -366,23 +366,9 @@ def record_simulation(states_file, actions_file, video_file):
             pusher.block_body.position.x,
             pusher.block_body.position.y,
             pusher.block_body.angle,
-            pusher.block_body.velocity.x,
-            pusher.block_body.velocity.y,
-            pusher.block_body.angular_velocity,
             # Pusher state
             pusher.push_body.position.x,
             pusher.push_body.position.y,
-            pusher.push_body.angle,
-            pusher.push_body.velocity.x,
-            pusher.push_body.velocity.y,
-            pusher.push_body.angular_velocity,
-            # Target state
-            pusher.target_body.position.x,
-            pusher.target_body.position.y,
-            pusher.target_body.angle,
-            pusher.target_body.velocity.x,
-            pusher.target_body.velocity.y,
-            pusher.target_body.angular_velocity
         ]
         recorded_states.append(deepcopy(state_list))
 
@@ -418,19 +404,10 @@ def create_video_from_actions(input_filename, output_filename,init_state):
 
     pusher.block_body.position = Vec2d(init_state[0], init_state[1])
     pusher.block_body.angle = init_state[2]
-    pusher.block_body.velocity = Vec2d(init_state[3], init_state[4])
-    pusher.block_body.angular_velocity = init_state[5]
+
     
 
-    pusher.push_body.position = Vec2d(init_state[6], init_state[7])
-    pusher.push_body.angle = init_state[8]
-    pusher.push_body.velocity = Vec2d(init_state[9], init_state[10])
-    pusher.push_body.angular_velocity = init_state[11]
-
-    pusher.target_body.position = Vec2d(init_state[12], init_state[13])
-    pusher.target_body.angle = init_state[14]
-    pusher.target_body.velocity = Vec2d(init_state[15], init_state[16])
-    pusher.target_body.angular_velocity = init_state[17]
+    pusher.push_body.position = Vec2d(init_state[3], init_state[4])
 
     rollout_states = []
     video_frames = []
@@ -442,23 +419,9 @@ def create_video_from_actions(input_filename, output_filename,init_state):
             pusher.block_body.position.x,
             pusher.block_body.position.y,
             pusher.block_body.angle,
-            pusher.block_body.velocity.x,
-            pusher.block_body.velocity.y,
-            pusher.block_body.angular_velocity,
-            # Pusher state
+
             pusher.push_body.position.x,
             pusher.push_body.position.y,
-            pusher.push_body.angle,
-            pusher.push_body.velocity.x,
-            pusher.push_body.velocity.y,
-            pusher.push_body.angular_velocity,
-            # Target state
-            pusher.target_body.position.x,
-            pusher.target_body.position.y,
-            pusher.target_body.angle,
-            pusher.target_body.velocity.x,
-            pusher.target_body.velocity.y,
-            pusher.target_body.angular_velocity
         ]
         rollout_states.append(deepcopy(state_list))
 
@@ -491,68 +454,68 @@ def save_video(frames, filename, fps=30):
     video_writer.release()
 
 
-def create_video_from_states(input_filename,output_filename):
-    recorded_states = input_filename
-    video_frames = []
+# def create_video_from_states(input_filename,output_filename):
+#     recorded_states = input_filename
+#     video_frames = []
 
-    pusher = Pusher()
-    rollout_states = []
-    for state in recorded_states:
-        # Create a new Pusher instance for this state
+#     pusher = Pusher()
+#     rollout_states = []
+#     for state in recorded_states:
+#         # Create a new Pusher instance for this state
 
-        pusher.block_body.position = Vec2d(state[0], state[1])
-        pusher.block_body.angle = state[2]
-        pusher.block_body.velocity = Vec2d(state[3], state[4])
-        pusher.block_body.angular_velocity = state[5]
+#         pusher.block_body.position = Vec2d(state[0], state[1])
+#         pusher.block_body.angle = state[2]
+#         # pusher.block_body.velocity = Vec2d(state[3], state[4])
+#         # pusher.block_body.angular_velocity = state[5]
         
-        # Pusher state (indices 6-11)
-        pusher.push_body.position = Vec2d(state[6], state[7])
-        pusher.push_body.angle = state[8]
-        pusher.push_body.velocity = Vec2d(state[9], state[10])
-        pusher.push_body.angular_velocity = state[11]
+#         # Pusher state (indices 6-11)
+#         pusher.push_body.position = Vec2d(state[3], state[4])
+#         # pusher.push_body.angle = state[8]
+#         # pusher.push_body.velocity = Vec2d(state[9], state[10])
+#         # pusher.push_body.angular_velocity = state[11]
         
-        # Target state (indices 12-17)
-        pusher.target_body.position = Vec2d(state[12], state[13])
-        pusher.target_body.angle = state[14]
-        pusher.target_body.velocity = Vec2d(state[15], state[16])
-        pusher.target_body.angular_velocity = state[17]
+#         # Target state (indices 12-17)
+#         # pusher.target_body.position = Vec2d(state[12], state[13])
+#         # pusher.target_body.angle = state[14]
+#         # pusher.target_body.velocity = Vec2d(state[15], state[16])
+#         # pusher.target_body.angular_velocity = state[17]
         
 
         
-        new_state_list = [
-        # Block state
-            pusher.block_body.position.x,
-            pusher.block_body.position.y,
-            pusher.block_body.angle,
-            pusher.block_body.velocity.x,
-            pusher.block_body.velocity.y,
-            pusher.block_body.angular_velocity,
-            # Pusher state
-            pusher.push_body.position.x,
-            pusher.push_body.position.y,
-            pusher.push_body.angle,
-            pusher.push_body.velocity.x,
-            pusher.push_body.velocity.y,
-            pusher.push_body.angular_velocity,
-            # Target state
-            pusher.target_body.position.x,
-            pusher.target_body.position.y,
-            pusher.target_body.angle,
-            pusher.target_body.velocity.x,
-            pusher.target_body.velocity.y,
-            pusher.target_body.angular_velocity
-        ]
-        pusher.space.step(pusher.options['dt'])
-        pusher.render()
+#         new_state_list = [
+#         # Block state
+#             pusher.block_body.position.x,
+#             pusher.block_body.position.y,
+#             pusher.block_body.angle,
+#             # pusher.block_body.velocity.x,
+#             # pusher.block_body.velocity.y,
+#             # pusher.block_body.angular_velocity,
+#             # Pusher state
+#             pusher.push_body.position.x,
+#             pusher.push_body.position.y,
+#             # pusher.push_body.angle,
+#             # pusher.push_body.velocity.x,
+#             # pusher.push_body.velocity.y,
+#             # pusher.push_body.angular_velocity,
+#             # Target state
+#             # pusher.target_body.position.x,
+#             # pusher.target_body.position.y,
+#             # pusher.target_body.angle,
+#             # pusher.target_body.velocity.x,
+#             # pusher.target_body.velocity.y,
+#             # pusher.target_body.angular_velocity
+#         ]
+#         pusher.space.step(pusher.options['dt'])
+#         pusher.render()
 
-        pygame.event.pump()
-        frame = pygame.surfarray.array3d(pusher.screen)
-        video_frames.append(frame.copy())
-        rollout_states.append(new_state_list)
+#         pygame.event.pump()
+#         frame = pygame.surfarray.array3d(pusher.screen)
+#         video_frames.append(frame.copy())
+#         rollout_states.append(new_state_list)
 
-    save_video(video_frames, "rollout_states.mp4")
+#     save_video(video_frames, "rollout_states.mp4")
 
-    return video_frames
+#     return video_frames
 
 
 
