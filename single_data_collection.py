@@ -22,7 +22,9 @@ import numpy as np
 import cv2
 import torch  
 from copy import deepcopy
-
+import shapely.geometry as sg
+from shapely.ops import unary_union, polygonize
+import argparse
 
 square_pts = [(40, 40), (40, -40), (-40, -40), (-40, 40)]
 trapezoid_pts = [(20, 20), (40, -40), (-40, -40), (-20, 20)]
@@ -79,7 +81,19 @@ X_img = [
                 "           "
                             ]
 
+parser = argparse.ArgumentParser(description='Pushing simulation with configurable block body shape')
+parser.add_argument('--shape', type=str, default='X',
+                    choices=['L', 'T', 'E', 'X'],
+                    help='Block body shape to use (L, T, E, X)')
+args = parser.parse_args()
 
+# Map argument to corresponding image
+shape_mapping = {
+    'L': L_img,
+    'T': T_img,
+    'E': E_img,
+    'X': X_img
+}
 
 
 OPTIONS = {
@@ -88,7 +102,7 @@ OPTIONS = {
     'dt': 1.0/60.0,
     'boundary_pts': [(10, 10), (590, 10), (590, 590), (10, 590)],
     'block_pts': T_pts,
-    'block_img': X_img,
+    'block_img': shape_mapping[args.shape],
     'block_img_scale': 10,
     'block_img_flag': True, 
     'block_mass': 10,
@@ -108,15 +122,43 @@ OPTIONS = {
     'march_fn': march_soft
 }
 
+def pymunk_to_shapely(body, shapes):
+    # Store converted polygons and segments separately
+    polygons = []
+    segment_lines = []
+    
+    for shape in shapes:
+        if isinstance(shape, pymunk.shapes.Poly):
+            verts = [body.local_to_world(v) for v in shape.get_vertices()]
+            verts.append(verts[0])  # Ensure the polygon is closed
+            polygons.append(sg.Polygon(verts))
+        elif isinstance(shape, pymunk.shapes.Segment):
+            a = body.local_to_world(shape.a)
+            b = body.local_to_world(shape.b)
+            segment_lines.append(sg.LineString([a, b]))
+        else:
+            raise RuntimeError(f"Unsupported shape type {type(shape)}")
+    poly_from_segments = list(polygonize(segment_lines))
+    all_polys = polygons + poly_from_segments
+    
+    if not all_polys:
+        raise RuntimeError("No valid polygon could be created from the shapes")
+
+    if len(all_polys) == 1:
+        return all_polys[0]
+
+    return unary_union(all_polys)
 
 class Pusher:
     def __init__(self, options = OPTIONS):
         self.options = options
         pygame.init()
+        os.environ['SDL_VIDEODRIVER'] = 'dummy' 
         self.screen = pygame.display.set_mode(self.options['screen_size'])
         self.clock = pygame.time.Clock()
         self.draw_options = pymunk.pygame_util.DrawOptions(self.screen)
         self.draw_options.flags = self.draw_options.DRAW_SHAPES | self.draw_options.DRAW_COLLISION_POINTS
+        self.draw_options.draw_shape = self._shapely_draw_shape
     
         self.space = pymunk.Space()
         self.space.damping = self.options['damping']
@@ -279,6 +321,16 @@ class Pusher:
                 seg.color = self.options['target_color']
                 self.space.add(seg)
 
+    def _shapely_draw_shape(self, shape,body,color):
+        try:
+            poly = pymunk_to_shapely(body, shape)
+            if isinstance(poly, sg.Polygon):
+                # Convert to pygame drawing coordinates
+                points = [(int(x), int(y))
+                        for x,y in poly.exterior.coords]
+                pygame.draw.polygon(self.screen, color, points, 0)
+        except RuntimeError as e:
+            print(f"Could not draw shape: {e}")
 
     def step(self, action):
         dx = action[0]
@@ -290,6 +342,8 @@ class Pusher:
         
     def render(self):
         self.screen.fill(pygame.Color("white"))
+        self._shapely_draw_shape(self.block_body.shapes,self.block_body,self.options['block_color'])
+        self._shapely_draw_shape(self.target_body.shapes,self.target_body,self.options['target_color'])
         self.space.debug_draw(self.draw_options)
         pygame.display.flip()
         self.clock.tick(50)
@@ -351,13 +405,13 @@ def record_simulation(states_file, actions_file, states_txt, actions_txt, video_
 
         
         state_list = [
+            # Pusher state
+            pusher.push_body.position.x,
+            pusher.push_body.position.y,
             # Block state
             pusher.block_body.position.x,
             pusher.block_body.position.y,
             pusher.block_body.angle,
-            # Pusher state
-            pusher.push_body.position.x,
-            pusher.push_body.position.y,
         ]
         recorded_states.append(deepcopy(state_list))
 
@@ -394,15 +448,16 @@ def record_simulation(states_file, actions_file, states_txt, actions_txt, video_
 
 def create_video_from_actions(input_filename, output_filename, init_state, states_from_actions_txt):
 
+    pygame.quit()
+    os.environ['SDL_VIDEODRIVER'] = 'dummy'
+    pygame.init()
     
     recorded_actions = torch.load(input_filename)
 
     pusher = Pusher()
-
-    pusher.block_body.position = Vec2d(init_state[0], init_state[1])
-    pusher.block_body.angle = init_state[2]
-    # Pusher state (indices 6-11)
-    pusher.push_body.position = Vec2d(init_state[3], init_state[4])
+    pusher.push_body.position = Vec2d(init_state[0], init_state[1])
+    pusher.block_body.position = Vec2d(init_state[2], init_state[3])
+    pusher.block_body.angle = init_state[4]
 
     rollout_states = []
     video_frames = []
@@ -410,13 +465,13 @@ def create_video_from_actions(input_filename, output_filename, init_state, state
     for action in recorded_actions:
 
         state_list = [
-        # Block state
-            pusher.block_body.position.x,
-            pusher.block_body.position.y,
-            pusher.block_body.angle,
             # Pusher state
             pusher.push_body.position.x,
             pusher.push_body.position.y,
+            # Block state
+            pusher.block_body.position.x,
+            pusher.block_body.position.y,
+            pusher.block_body.angle,
         ]
         rollout_states.append(deepcopy(state_list))
 
@@ -437,21 +492,38 @@ def create_video_from_actions(input_filename, output_filename, init_state, state
     save_video(video_frames, output_filename)
 
 
-
-
 def save_video(frames, filename, fps=30):
     if not frames:
+        print("No frames to save.")
         return
 
+    # Prepare the first frame and determine frame dimensions
     frame0 = np.transpose(frames[0], (1, 0, 2))
     height, width = frame0.shape[:2]
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    
+    # Initialize VideoWriter and check if it is opened successfully
     video_writer = cv2.VideoWriter(filename, fourcc, fps, (width, height))
-    for frame in frames:
+    if not video_writer.isOpened():
+        raise IOError("Could not open the video writer.")
 
+    # Write each frame to the video file
+    frame_count = 0
+    for frame in frames:
         frame_cv = np.transpose(frame, (1, 0, 2))
         video_writer.write(frame_cv)
+        frame_count += 1
     video_writer.release()
+    print(f"{frame_count} frames written to {filename}.")
+
+    # Optional: Verify the saved video frame count
+    cap = cv2.VideoCapture(filename)
+    if not cap.isOpened():
+        print("Could not open the saved video for verification.")
+    else:
+        saved_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        cap.release()
+        print(f"Verification: Video contains {saved_frames} frames.")
 
 
 
