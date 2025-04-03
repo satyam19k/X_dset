@@ -8,7 +8,7 @@ import os
 import pygame
 
 from copy import deepcopy
-
+import random
 import pymunk
 import pymunk.constraints
 import pymunk.pygame_util
@@ -387,6 +387,34 @@ def record_simulation(states_file, actions_file, states_txt, actions_txt, video_
     recorded_states = []
     recorded_actions = []
     video_frames = []
+
+    pusher_pos_x = float(random.randint(100, 500))
+    pusher_pos_y = float(random.randint(100, 500))
+
+    pusher_angle = float(random.random()* 2 * np.pi - np.pi)
+
+    x = random.randint(1,4)
+
+    if x==1:
+        push_body_x = pusher_pos_x - 80
+        push_body_y = pusher_pos_y
+    if x==2:
+        push_body_x = pusher_pos_x + 80
+        push_body_y = pusher_pos_y
+    if x==3:
+        push_body_x = pusher_pos_x
+        push_body_y = pusher_pos_y - 80
+    if x==4:
+        push_body_x = pusher_pos_x
+        push_body_y = pusher_pos_y + 80
+    
+    pusher.block_body.position = Vec2d(pusher_pos_x,pusher_pos_y)
+    pusher.block_body.angle = pusher_angle 
+
+    pusher.push_body.position = Vec2d(push_body_x,push_body_y)
+    pusher.key_body.position = Vec2d(push_body_x,push_body_y)
+    pusher.step([0.0, 0.0])
+    pusher.render()
 
     while running:
        

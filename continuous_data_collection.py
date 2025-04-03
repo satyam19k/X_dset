@@ -6,9 +6,9 @@ __docformat__ = "reStructuredText"
 import sys
 import os
 import pygame
-
+import random
 from copy import deepcopy
-
+import argparse
 import pymunk
 import pymunk.constraints
 import pymunk.pygame_util
@@ -76,7 +76,19 @@ X_img = [
                             ]
 
 
+parser = argparse.ArgumentParser(description='Pushing simulation with configurable block body shape')
+parser.add_argument('--shape', type=str, default='X',
+                    choices=['L', 'T', 'E', 'X'],
+                    help='Block body shape to use (L, T, E, X)')
+args = parser.parse_args()
 
+# Map argument to corresponding image
+shape_mapping = {
+    'L': L_img,
+    'T': T_img,
+    'E': E_img,
+    'X': X_img
+}
 
 OPTIONS = {
     'screen_size': (600, 600),
@@ -84,7 +96,7 @@ OPTIONS = {
     'dt': 1.0/60.0,
     'boundary_pts': [(10, 10), (590, 10), (590, 590), (10, 590)],
     'block_pts': T_pts,
-    'block_img': X_img,
+    'block_img': shape_mapping[args.shape],
     'block_img_scale': 10,
     'block_img_flag': True, 
     'block_mass': 10,
@@ -347,6 +359,34 @@ def record_simulation(states_file, actions_file, video_file):
     recorded_actions = []
     video_frames = []
 
+    pusher_pos_x = float(random.randint(100, 500))
+    pusher_pos_y = float(random.randint(100, 500))
+
+    pusher_angle = float(random.random()* 2 * np.pi - np.pi)
+
+    x = random.randint(1,4)
+
+    if x==1:
+        push_body_x = pusher_pos_x - 80
+        push_body_y = pusher_pos_y
+    if x==2:
+        push_body_x = pusher_pos_x + 80
+        push_body_y = pusher_pos_y
+    if x==3:
+        push_body_x = pusher_pos_x
+        push_body_y = pusher_pos_y - 80
+    if x==4:
+        push_body_x = pusher_pos_x
+        push_body_y = pusher_pos_y + 80
+    
+    pusher.block_body.position = Vec2d(pusher_pos_x,pusher_pos_y)
+    pusher.block_body.angle = pusher_angle 
+
+    pusher.push_body.position = Vec2d(push_body_x,push_body_y)
+    pusher.key_body.position = Vec2d(push_body_x,push_body_y)
+    pusher.step([0.0, 0.0])
+    pusher.render()
+
     while running:
         all_keys = pygame.key.get_pressed()
         action = [0.0, 0.0]
@@ -362,13 +402,14 @@ def record_simulation(states_file, actions_file, video_file):
         recorded_actions.append(deepcopy(action))
 
         state_list = [
-        # Block state
-            pusher.block_body.position.x,
-            pusher.block_body.position.y,
-            pusher.block_body.angle,
             # Pusher state
             pusher.push_body.position.x,
             pusher.push_body.position.y,
+            # Block state
+            pusher.block_body.position.x,
+            pusher.block_body.position.y,
+            pusher.block_body.angle,
+            
         ]
         recorded_states.append(deepcopy(state_list))
 
@@ -402,12 +443,10 @@ def create_video_from_actions(input_filename, output_filename,init_state):
 
     pusher = Pusher()
 
-    pusher.block_body.position = Vec2d(init_state[0], init_state[1])
-    pusher.block_body.angle = init_state[2]
+    pusher.push_body.position = Vec2d(init_state[0], init_state[1])
+    pusher.block_body.position = Vec2d(init_state[2], init_state[3])
+    pusher.block_body.angle = init_state[5]
 
-    
-
-    pusher.push_body.position = Vec2d(init_state[3], init_state[4])
 
     rollout_states = []
     video_frames = []
@@ -415,13 +454,13 @@ def create_video_from_actions(input_filename, output_filename,init_state):
     for action in recorded_actions:
 
         state_list = [
-        # Block state
+            # Pusher state
+            pusher.push_body.position.x,
+            pusher.push_body.position.y,
+            # Block state
             pusher.block_body.position.x,
             pusher.block_body.position.y,
             pusher.block_body.angle,
-
-            pusher.push_body.position.x,
-            pusher.push_body.position.y,
         ]
         rollout_states.append(deepcopy(state_list))
 
@@ -436,22 +475,40 @@ def create_video_from_actions(input_filename, output_filename,init_state):
     
     return video_frames
 
-
-
-
 def save_video(frames, filename, fps=30):
     if not frames:
+        print("No frames to save.")
         return
 
+    # Prepare the first frame and determine frame dimensions
     frame0 = np.transpose(frames[0], (1, 0, 2))
     height, width = frame0.shape[:2]
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    
+    # Initialize VideoWriter and check if it is opened successfully
     video_writer = cv2.VideoWriter(filename, fourcc, fps, (width, height))
-    for frame in frames:
+    if not video_writer.isOpened():
+        raise IOError("Could not open the video writer.")
 
+    # Write each frame to the video file
+    frame_count = 0
+    for frame in frames:
         frame_cv = np.transpose(frame, (1, 0, 2))
         video_writer.write(frame_cv)
+        frame_count += 1
     video_writer.release()
+    print(f"{frame_count} frames written to {filename}.")
+
+    # Optional: Verify the saved video frame count
+    cap = cv2.VideoCapture(filename)
+    if not cap.isOpened():
+        print("Could not open the saved video for verification.")
+    else:
+        saved_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        cap.release()
+        print(f"Verification: Video contains {saved_frames} frames.")
+
+
 
 
 # def create_video_from_states(input_filename,output_filename):
