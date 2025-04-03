@@ -1,7 +1,7 @@
 # Single_data_collect.py
 
 - **record_simulation**
-  - Records simulation actions and states.
+  - Records simulation actions and states. Initial state is randomized. Block shape is passed as command line argument.
   - Saves the simulation as a video.
   - Generates `states.pth` capturing the recorded states and `action.pth` capturing the recorded states.
   - Generates `states.txt` capturing the recorded states and `action.txt` capturing the recorded states.
