@@ -476,9 +476,9 @@ def record_simulation(states_file, actions_file, states_txt, actions_txt, video_
 
 def create_video_from_actions(input_filename, output_filename, init_state, states_from_actions_txt):
 
-    pygame.quit()
-    os.environ['SDL_VIDEODRIVER'] = 'dummy'
-    pygame.init()
+    # pygame.quit()
+    # os.environ['SDL_VIDEODRIVER'] = 'dummy'
+    # pygame.init()
     
     recorded_actions = torch.load(input_filename)
 
@@ -486,6 +486,9 @@ def create_video_from_actions(input_filename, output_filename, init_state, state
     pusher.push_body.position = Vec2d(init_state[0], init_state[1])
     pusher.block_body.position = Vec2d(init_state[2], init_state[3])
     pusher.block_body.angle = init_state[4]
+    pusher.key_body.position = Vec2d(float(init_state[0]), float(init_state[1]))
+    pusher.step([0.0, 0.0])
+    pusher.render()
 
     rollout_states = []
     video_frames = []
