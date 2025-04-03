@@ -442,10 +442,12 @@ def create_video_from_actions(input_filename, output_filename,init_state):
     recorded_actions = input_filename
 
     pusher = Pusher()
-
     pusher.push_body.position = Vec2d(init_state[0], init_state[1])
     pusher.block_body.position = Vec2d(init_state[2], init_state[3])
-    pusher.block_body.angle = init_state[5]
+    pusher.block_body.angle = init_state[4]
+    pusher.key_body.position = Vec2d(float(init_state[0]), float(init_state[1]))
+    pusher.step([0.0, 0.0])
+    pusher.render()
 
 
     rollout_states = []
@@ -475,22 +477,20 @@ def create_video_from_actions(input_filename, output_filename,init_state):
     
     return video_frames
 
+
 def save_video(frames, filename, fps=30):
     if not frames:
         print("No frames to save.")
         return
 
-    # Prepare the first frame and determine frame dimensions
     frame0 = np.transpose(frames[0], (1, 0, 2))
     height, width = frame0.shape[:2]
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     
-    # Initialize VideoWriter and check if it is opened successfully
     video_writer = cv2.VideoWriter(filename, fourcc, fps, (width, height))
     if not video_writer.isOpened():
         raise IOError("Could not open the video writer.")
 
-    # Write each frame to the video file
     frame_count = 0
     for frame in frames:
         frame_cv = np.transpose(frame, (1, 0, 2))
@@ -499,7 +499,7 @@ def save_video(frames, filename, fps=30):
     video_writer.release()
     print(f"{frame_count} frames written to {filename}.")
 
-    # Optional: Verify the saved video frame count
+
     cap = cv2.VideoCapture(filename)
     if not cap.isOpened():
         print("Could not open the saved video for verification.")
@@ -507,9 +507,6 @@ def save_video(frames, filename, fps=30):
         saved_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         cap.release()
         print(f"Verification: Video contains {saved_frames} frames.")
-
-
-
 
 # def create_video_from_states(input_filename,output_filename):
 #     recorded_states = input_filename
