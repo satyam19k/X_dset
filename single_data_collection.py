@@ -85,6 +85,12 @@ parser = argparse.ArgumentParser(description='Pushing simulation with configurab
 parser.add_argument('--shape', type=str, default='X',
                     choices=['L', 'T', 'E', 'X'],
                     help='Block body shape to use (L, T, E, X)')
+parser.add_argument('--target', type=str, default='Y',
+                    choices=['Y','N'],
+                    help='Y target body is shown, N target body is not shown')
+parser.add_argument('--skip_zero_action', type=str, default='Y',
+                    choices=['Y','N'],
+                    help="Y don't record the zero ([0.,0.]) actions , N record the zero actions")
 args = parser.parse_args()
 
 # Map argument to corresponding image
@@ -116,7 +122,7 @@ OPTIONS = {
     'friction': 1.0,
     'block_color': (254, 33, 139, 255),
     'pusher_color': (33, 176, 254, 255.),
-    'target_color': (254, 215, 0, 0.),
+    'target_color': (254, 215, 0, 0.) if args.target == 'Y' else (255, 255, 255, 0.),
     'controller_stiffness': 10000,
     'controller_damping': 1000,
     'march_fn': march_soft
@@ -342,15 +348,15 @@ class Pusher:
         
     def render(self):
         self.screen.fill(pygame.Color("white"))
-        self._shapely_draw_shape(self.block_body.shapes,self.block_body,self.options['block_color'])
-        self._shapely_draw_shape(self.target_body.shapes,self.target_body,self.options['target_color'])
+        #self._shapely_draw_shape(self.block_body.shapes,self.block_body,self.options['block_color'])
+        #self._shapely_draw_shape(self.target_body.shapes,self.target_body,self.options['target_color'])
         self.space.debug_draw(self.draw_options)
         pygame.display.flip()
-        self.clock.tick(50)
+        self.clock.tick(20)
 
 def main():
     pusher = Pusher()
-    delta_action = 2
+    delta_action = 4
     running = True
     while running:
         all_keys = pygame.key.get_pressed()
@@ -375,13 +381,9 @@ def main():
         pusher.render()
 
 
-
-
-
-
 def record_simulation(states_file, actions_file, states_txt, actions_txt, video_file_name):
     pusher = Pusher()
-    delta_action = 2
+    delta_action = 4
     running = True
 
     recorded_states = []
@@ -392,6 +394,12 @@ def record_simulation(states_file, actions_file, states_txt, actions_txt, video_
     pusher_pos_y = float(random.randint(100, 500))
 
     pusher_angle = float(random.random()* 2 * np.pi - np.pi)
+
+
+    target_pos_x = float(random.randint(100, 500))
+    target_pos_y = float(random.randint(100, 500))
+
+    target_angle = float(random.random()* 2 * np.pi - np.pi)
 
     x = random.randint(1,4)
 
@@ -413,6 +421,10 @@ def record_simulation(states_file, actions_file, states_txt, actions_txt, video_
 
     pusher.push_body.position = Vec2d(push_body_x,push_body_y)
     pusher.key_body.position = Vec2d(push_body_x,push_body_y)
+
+    pusher.target_body.position=Vec2d(target_pos_x,target_pos_y)
+    pusher.target_body.angle=target_angle
+
     pusher.step([0.0, 0.0])
     pusher.render()
 
@@ -429,26 +441,33 @@ def record_simulation(states_file, actions_file, states_txt, actions_txt, video_
         if all_keys[pygame.K_RIGHT]:
             action[0] += delta_action
 
-        recorded_actions.append(deepcopy(action))
+        if (args.skip_zero_action == 'Y' and (action[0] != 0.0 or action[1] != 0.0)) or args.skip_zero_action == 'N':
+
+            recorded_actions.append(deepcopy(action))
+            
+            state_list = [
+                # Pusher state
+                pusher.push_body.position.x,
+                pusher.push_body.position.y,
+                # Block state
+                pusher.block_body.position.x,
+                pusher.block_body.position.y,
+                pusher.block_body.angle,
+
+                pusher.target_body.position.x,
+                pusher.target_body.position.y,
+                pusher.target_body.angle,
+
+            ]
+            recorded_states.append(deepcopy(state_list))
 
         
-        state_list = [
-            # Pusher state
-            pusher.push_body.position.x,
-            pusher.push_body.position.y,
-            # Block state
-            pusher.block_body.position.x,
-            pusher.block_body.position.y,
-            pusher.block_body.angle,
-        ]
-        recorded_states.append(deepcopy(state_list))
+            pusher.render()
+            frame = pygame.surfarray.array3d(pusher.screen)
+            video_frames.append(frame.copy())
 
+            pusher.step(action)
         
-        pusher.render()
-        frame = pygame.surfarray.array3d(pusher.screen)
-        video_frames.append(frame.copy())
-
-        pusher.step(action)
 
 
         for event in pygame.event.get():
@@ -487,6 +506,10 @@ def create_video_from_actions(input_filename, output_filename, init_state, state
     pusher.block_body.position = Vec2d(init_state[2], init_state[3])
     pusher.block_body.angle = init_state[4]
     pusher.key_body.position = Vec2d(float(init_state[0]), float(init_state[1]))
+
+    pusher.target_body.position=Vec2d(float(init_state[5]), float(init_state[6]))
+    pusher.target_body.angle=init_state[7]
+
     pusher.step([0.0, 0.0])
     pusher.render()
 
@@ -503,6 +526,10 @@ def create_video_from_actions(input_filename, output_filename, init_state, state
             pusher.block_body.position.x,
             pusher.block_body.position.y,
             pusher.block_body.angle,
+
+            pusher.target_body.position.x,
+            pusher.target_body.position.y,
+            pusher.target_body.angle,
         ]
         rollout_states.append(deepcopy(state_list))
 
@@ -627,6 +654,7 @@ if __name__ == "__main__":
     recorded_states = torch.load(states_pth)
 
     # Sanity Check
+
     create_video_from_actions(actions_pth, actions_video_path, recorded_states[0], states_from_actions_txt)
     
     combine_videos_side_by_side(recorded_video_path, actions_video_path, combined_video_path)
